@@ -140,6 +140,7 @@ _FEISHU_DOC_UPLOAD_TYPES = {
     ".docx": "doc",
     ".xls": "xls",
     ".xlsx": "xls",
+    ".csv": "csv",
     ".ppt": "ppt",
     ".pptx": "ppt",
 }
@@ -3394,6 +3395,7 @@ class FeishuAdapter(BasePlatformAdapter):
                 form.add_field("file", file_data, filename=display_name, content_type=mime_type)
                 form.add_field("file_name", display_name)
                 form.add_field("file_type", upload_file_type)
+                form.add_field("receive_id", chat_id)
 
                 upload_resp = await http.post(
                     "https://open.feishu.cn/open-apis/im/v1/files",
@@ -3431,6 +3433,7 @@ class FeishuAdapter(BasePlatformAdapter):
                     payload=json.dumps({"file_key": file_key}, ensure_ascii=False),
                     reply_to=reply_to,
                     metadata=metadata,
+                    receive_id_type="open_id",
                 )
             return self._finalize_send_result(message_response, "file send failed")
         except Exception as exc:
@@ -3445,6 +3448,7 @@ class FeishuAdapter(BasePlatformAdapter):
         payload: str,
         reply_to: Optional[str],
         metadata: Optional[Dict[str, Any]],
+        receive_id_type: str = "chat_id",
     ) -> Any:
         reply_in_thread = bool((metadata or {}).get("thread_id"))
         if reply_to:
@@ -3463,7 +3467,7 @@ class FeishuAdapter(BasePlatformAdapter):
             content=payload,
             uuid_value=str(uuid.uuid4()),
         )
-        request = self._build_create_message_request("chat_id", body)
+        request = self._build_create_message_request(receive_id_type, body)
         return await asyncio.to_thread(self._client.im.v1.message.create, request)
 
     @staticmethod
@@ -3588,6 +3592,7 @@ class FeishuAdapter(BasePlatformAdapter):
         payload: str,
         reply_to: Optional[str],
         metadata: Optional[Dict[str, Any]],
+        receive_id_type: str = "chat_id",
     ) -> Any:
         last_error: Optional[Exception] = None
         active_reply_to = reply_to
@@ -3599,6 +3604,7 @@ class FeishuAdapter(BasePlatformAdapter):
                     payload=payload,
                     reply_to=active_reply_to,
                     metadata=metadata,
+                    receive_id_type=receive_id_type,
                 )
                 # If replying to a message failed because it was withdrawn or not found,
                 # fall back to posting a new message directly to the chat.
@@ -3619,6 +3625,7 @@ class FeishuAdapter(BasePlatformAdapter):
                             payload=payload,
                             reply_to=None,
                             metadata=metadata,
+                            receive_id_type=receive_id_type,
                         )
                 return response
             except Exception as exc:
